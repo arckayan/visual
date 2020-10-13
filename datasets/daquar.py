@@ -25,9 +25,16 @@ from torch.utils.data import Dataset
 
 # dataset modules developed as part of this resarch project
 from datasets.vocabulary import Vocabulary
+
 # from datasets.downloader import download_dataset
 from datasets.urls import DAQUAR_URLS
-from datasets.urls import DAQUAR_IM, DAQUAR_QA_TRAIN, DAQUAR_IM_TRAIN
+from datasets.urls import (
+    DAQUAR_IM,
+    DAQUAR_QA_TRAIN,
+    DAQUAR_IM_TRAIN,
+    DAQUAR_IM_TEST,
+    DAQUAR_QA_TEST,
+)
 
 
 ###############################################################################
@@ -48,156 +55,176 @@ class DaquarDataFolder:
     images, translating question answer pairs in a json.
     """
 
-    def __init__(self, path="./data/daquar", force=False, verbose=False):
+    def __init__(self, path="./data/daquar", train=True, force=False, verbose=False):
         """Construct a brand new Dqauar Data Folder
 
         Args:
             path (str, optional): folders path. Defaults to "./data/daquar".
+            train (bool, optional): for training set path. Defaults to True
             force (bool, optional): to force download. Defaults to False.
             verbose (bool, optional): detailed logs. Defaults to False.
         """
         self._path = os.path.abspath(path)
+        self._train = train
         self._force = force
         self._verbose = verbose
+
         self._urls = DAQUAR_URLS
 
-        self._IM_DIR_TEST = "test_images"
-        self._IM_DIR_TRAIN = "train_images"
-        self._QA_JSON_TRAIN = "qa_train.json"
+        # Final processed outputs image directories and qa json for train, and
+        # test data
+        self._PROCESSED_IM_TEST = "test_images"
+        self._PROCESSED_IM_TRAIN = "train_images"
+        self._PROCESSED_QA_TEST = "qa_test.json"
+        self._PROCESSED_QA_TRAIN = "qa_train.json"
 
-        ###############   Paths for image directories and files ###############
+        # Paths for files downloaded during processing (these paths are for
+        # processing purpose only will not be returned as result)
 
-        # images
-        self._im_extracted_path = os.path.join(
-            self._path, self._urls[DAQUAR_IM].split("/")[-1].split(".")[0]
-        )
-        self._im_test_path = os.path.join(self._path, self._IM_DIR_TEST)
-        self._im_train_path = os.path.join(self._path, self._IM_DIR_TRAIN)
-        self._im_tar_path = os.path.join(
-            self._path, self._urls[DAQUAR_IM].split("/")[-1]
-        )
-        self._im_train_list_path = os.path.join(
-            self._path, self._urls[DAQUAR_IM_TRAIN].split("/")[-1]
-        )
+        # tar file name containing all the images
+        self._tar_fullname = self._urls[DAQUAR_IM].split("/")[-1]  # .tar
+        self._tar_name = self._tar_fullname.split(".")[0]  # nyu_depth_images
+        self._tar_path = self._abspath(self._tar_fullname)
 
-        # qa pairs
-        self._qa_train_txt_path = os.path.join(
-            self._path, self._urls[DAQUAR_QA_TRAIN].split("/")[-1]
-        )
-        self._qa_train_json_path = os.path.join(self._path, self._QA_JSON_TRAIN)
+        # file that list of images in train and test dataset
+        self._txt_im_test_name = self._urls[DAQUAR_IM_TEST].split("/")[-1]
+        self._txt_im_train_name = self._urls[DAQUAR_IM_TRAIN].split("/")[-1]
+        self._txt_im_test_path = self._abspath(self._txt_im_test_name)
+        self._txt_im_train_path = self._abspath(self._txt_im_train_name)
 
-        #   logging if verbose is set to true
-        if self._verbose:
-            _L("Images .tar path " + _P(self._im_tar_path))
-            _L("Images extraction path " + _P(self._im_extracted_path))
-            _L("Test images path " + _P(self._im_test_path))
-            _L("Train images path " + _P(self._im_train_path))
-            _L("Train pairs text " + _P(self._qa_train_txt_path))
-            _L("Train processed json " + _P(self._qa_train_json_path))
-            _L("Images train list path" + _P(self._im_train_list_path))
+        # txt file that holds all the question answers pairs
+        self._txt_qa_test_name = self._urls[DAQUAR_QA_TEST].split("/")[-1]
+        self._txt_qa_train_name = self._urls[DAQUAR_QA_TRAIN].split("/")[-1]
+        self._txt_qa_test_path = self._abspath(self._txt_qa_test_name)
+        self._txt_qa_train_path = self._abspath(self._txt_qa_train_name)
 
-        self.paths = {
-            self._IM_DIR_TEST: self._im_test_path,
-            self._IM_DIR_TRAIN: self._im_train_path,
-            "qa_train": self._qa_train_json_path,
-        }
+        # Json file hold all the vqa tuples
+        self._json_test = self._abspath(self._PROCESSED_QA_TEST)  # output
+        self._json_train = self._abspath(self._PROCESSED_QA_TRAIN)  # output
 
-        if force or (
-            os.path.exists(self._im_train_path) == False
-            and os.path.exists(self._im_test_path) == False
+        # image directories paths
+        self._dir_im_extracted = self._abspath(self._tar_name)
+        self._dir_im_test = self._abspath(self._PROCESSED_IM_TEST)  # output
+        self._dir_im_train = self._abspath(self._PROCESSED_IM_TRAIN)  # output
+
+        # Downloadin, and processing vqa
+
+        if self._force or (
+            not os.path.exists(self._dir_im_test)
+            and not os.path.exists(self._dir_im_train)
         ):
             self._download()
             self._extract_images()
             self._resolve_dirs()
             self._process_images()
-            self._process_questions()
+
+            if self._train:
+                self._process_questions(self._txt_qa_train_path,
+                                        self._json_train)
+            else:
+                self._process_questions(self._txt_qa_test_path,
+                                        self._json_test)
+
+    # useable api for the class
 
     def paths(self):
-        return self.paths
+        """Return the paths of the processed and useable dataset
+
+        Returns:
+            [string, string]: paths for image directory and json
+        """
+        if self._train:
+            return self._dir_im_train, self._json_train
+        else:
+            return self._dir_im_test, self._json_test
+
+    # Helper functions
+
+    def _abspath(self, path):
+        # Return the absolute path after joining with the data folder path
+        return os.path.join(self._path, path)
+
+    def _VL(self, log):
+        # print the log according to the given verbosity
+        if self._verbose:
+            _L(log)
 
     def _download(self):
         """Download the dataset from the web, urls are predefined in the config
         """
-        if self._verbose:
-            _L("Downloading " + _P("DAQUAR") + " in " + _S(self._path))
+
+        self._VL("Downloading " + _P("DAQUAR") + " in " + _S(self._path))
 
     #     download_dataset(self._urls, self._path)
 
     def _extract_images(self):
-        """extract the downloaded images
+        """Extract the downloaded images
         """
-        if self._verbose:
-            _L("Extracting the images in " + _P(self._im_extracted_path))
 
+        self._VL("Extracting the images in " + _P(self._dir_im_extracted))
+
+        # extract with output according to the verbosity
         os.system(
             "tar xvfj {} -C {} {}".format(
-                self._im_tar_path,
+                self._tar_path,
                 self._path,
-                ">/dev/null 2>&1" if self._verbose == False else " ",
+                ">/dev/null 2>&1" if not self._verbose else " ",
             )
         )
 
     def _resolve_dirs(self):
         """Resolve directories, delete old directories and create new ones
         """
-        if self._verbose:
-            _L("Resolving directories")
-        # Del existing directories
-        os.system("rm -rf {} {}".format(self._im_test_path, self._im_train_path))
+
+        self._VL("Resolving directories, deleting old and creating new")
+
+        # Delete the existing directories
+        os.system("rm -rf {} {}".format(self._dir_im_test, self._dir_im_train))
 
         # Rename the intermediate folder to test_images
-        os.system("mv {} {}".format(self._im_extracted_path, self._im_test_path))
-        os.makedirs(self._im_train_path, exist_ok=True)
+        os.system("mv {} {}".format(self._dir_im_extracted, self._dir_im_test))
+        
+        # make train directory
+        os.makedirs(self._dir_im_train, exist_ok=True)
 
     def _process_images(self):
-        #   Process the downloaded dataset, split the images into test & train
-        #   directories, and remove the intermediate files.
-        #
-        #   The dataset is split according to the list provided in the files in
-        #   dataset with names test.txt and train.txt.
-        #
+        """Process the downloaded dataset, split the images into test & train
+           directories, and remove the intermediate directories.
 
-        # Seperate files according to train.txt and test.txt
+           The dataset is split according to the list provided in the files in
+           the dataset with name test.txt and train.txt
+        """
 
-        if self._verbose:
-            _L(
-                "Seperating files from {} to {}".format(
-                    _P(self._im_test_path), _S(self._im_train_path)
-                )
-            )
+        self._VL("Seperating files from {} to {}".format(
+                    _P(self._dir_im_test), _S(self._dir_im_train)
+                ))
 
-        with open(self._im_train_list_path) as training_images_list:
+        # move images which are in the train.txt list to the newly created test
+        # directories
+        with open(self._txt_im_train_path) as training_images_list:
             for image in [line.rstrip("\n") for line in training_images_list]:
 
                 # mv  files from from_ to to_
-                from_ = os.path.join(self._im_test_path, image) + ".png"
-                to_ = os.path.join(self._im_train_path, image) + ".png"
+                os.system("mv {} {}".format(
+                    os.path.join(self._dir_im_test, image) + ".png",
+                    os.path.join(self._dir_im_train, image) + ".png"
+                ))
 
-                os.system("mv {} {}".format(from_, to_))
+    def _process_questions(self, from_, to_):
+        """Process the downloaded questions, convert the txt files in json of
+           tuples of image_id, question, answers.
 
-                if self._verbose:
-                    _L("{} moved to {}".format(_P(from_), _S(to_)))
+        Args:
+            from_ (string): txt file to be processed
+            to_ (string): processed json file
+        """
 
-        if self._verbose:
-            _L(
-                "Extracted "
-                + _P(len(os.listdir(self._im_test_path)))
-                + " Images in "
-                + _S(self._im_test_path)
-            )
-            _L(
-                "Extracted "
-                + _P(len(os.listdir(self._im_train_path)))
-                + " Images in "
-                + _S(self._im_train_path)
-            )
+        self._VL("Processing the questions and answers, and creating a JSON")
 
-    def _process_questions(self):
-        # process the questions
-        with open(self._qa_train_txt_path) as questions_json:
+        with open(from_) as txt_file:
             processed_questions = []
-            for idx in questions_json:
-                idx_n = next(questions_json)
+            for idx in txt_file:
+                idx_n = next(txt_file)
 
                 q = idx.rstrip("\n")
                 a = idx_n.rstrip("\n")
@@ -211,7 +238,7 @@ class DaquarDataFolder:
 
                 processed_questions.append(processed)
 
-            with open(self._qa_train_json_path, "w", encoding="utf-8") as f:
+            with open(to_, "w", encoding="utf-8") as f:
                 json.dump(processed_questions, f, ensure_ascii=False, indent=4)
 
 
@@ -223,7 +250,7 @@ class DaquarDataFolder:
 ###############################################################################
 class Daquar(Dataset):
     """
-    DAQUAR dataset, more info can be found at 
+    DAQUAR dataset, more info can be found at
     """
 
     def __init__(self, paths, transform):

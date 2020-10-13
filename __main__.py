@@ -25,18 +25,21 @@ if __name__ == "__main__":
     parser.add_argument("--verbose",
                         help="set output verbosity",
                         default=0)
+    parser.add_argument("--train",
+                        help="use the train dataset",
+                        default=False)
 
     args = parser.parse_args()
 
     daquar_processed_paths = fryday_ds.DaquarDataFolder(
-        force=args.download, verbose=args.verbose
-    ).paths()
+        force=args.download, verbose=args.verbose, train=args.train
+    )
     
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
-    )
-    print(daquar_processed_paths)
-    dataset = fryday_ds.Daquar(daquar_processed_paths, transform)
-    trainloader = torch.utils.data.DataLoader(
-        dataset, batch_size=BATCH_SIZE, num_workers=0, shuffle=True
-    )
+    # transform = transforms.Compose(
+    #     [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+    # )
+    # print(daquar_processed_paths)
+    # dataset = fryday_ds.Daquar(daquar_processed_paths, transform)
+    # trainloader = torch.utils.data.DataLoader(
+    #     dataset, batch_size=BATCH_SIZE, num_workers=0, shuffle=True
+    # )
