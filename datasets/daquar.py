@@ -119,11 +119,9 @@ class DaquarDataFolder:
             self._process_images()
 
             if self._train:
-                self._process_questions(self._txt_qa_train_path,
-                                        self._json_train)
+                self._process_questions(self._txt_qa_train_path, self._json_train)
             else:
-                self._process_questions(self._txt_qa_test_path,
-                                        self._json_test)
+                self._process_questions(self._txt_qa_test_path, self._json_test)
 
     # useable api for the class
 
@@ -183,7 +181,7 @@ class DaquarDataFolder:
 
         # Rename the intermediate folder to test_images
         os.system("mv {} {}".format(self._dir_im_extracted, self._dir_im_test))
-        
+
         # make train directory
         os.makedirs(self._dir_im_train, exist_ok=True)
 
@@ -195,9 +193,11 @@ class DaquarDataFolder:
            the dataset with name test.txt and train.txt
         """
 
-        self._VL("Seperating files from {} to {}".format(
-                    _P(self._dir_im_test), _S(self._dir_im_train)
-                ))
+        self._VL(
+            "Seperating files from {} to {}".format(
+                _P(self._dir_im_test), _S(self._dir_im_train)
+            )
+        )
 
         # move images which are in the train.txt list to the newly created test
         # directories
@@ -205,10 +205,12 @@ class DaquarDataFolder:
             for image in [line.rstrip("\n") for line in training_images_list]:
 
                 # mv  files from from_ to to_
-                os.system("mv {} {}".format(
-                    os.path.join(self._dir_im_test, image) + ".png",
-                    os.path.join(self._dir_im_train, image) + ".png"
-                ))
+                os.system(
+                    "mv {} {}".format(
+                        os.path.join(self._dir_im_test, image) + ".png",
+                        os.path.join(self._dir_im_train, image) + ".png",
+                    )
+                )
 
     def _process_questions(self, from_, to_):
         """Process the downloaded questions, convert the txt files in json of
@@ -248,42 +250,50 @@ class DaquarDataFolder:
 #   questions and answers.
 #
 ###############################################################################
+
+
 class Daquar(Dataset):
     """
     DAQUAR dataset, more info can be found at
     """
 
-    def __init__(self, paths, transform):
+    def __init__(self, datafolder, transform):
+        """Constructor for the Daquar
+
+        Args:
+            datafolder (DataFolder): path pointing to image directory
+            transform : transformer for the images
         """
-        Constructor for the Daquar
-        """
-        self._paths = paths
-        self._images = paths["train_images"]
-        self._qa_json = paths["qa_train"]
+
+        im, qa = datafolder.paths()
+
+        # paths for image directory and qa json file
+        self._im = im
+        self._qa = qa
+
+        self._vocab_q = Vocabulary("questions")
+        self._vocab_a = Vocabulary("answer")
 
         self._questions = {}
         self._answers = {}
 
-        self._vocab = Vocabulary("qa")
-        self._ans_vocab = Vocabulary("answer")
-
         self.transform = transform
-        self.total_imgs = natsort.natsorted(os.listdir(self._images))
+        self.total_imgs = natsort.natsorted(os.listdir(self._im))
 
         self._build_vocab()
         self._process_qa()
 
     def _build_vocab(self):
-        with open(self._qa_json) as f:
-            json_pairs = json.load(f)
+        with open(self._qa) as json_f:
+            json_pairs = json.load(json_f)
             for pair in json_pairs:
-                self._vocab.add_sentence(pair["question"])
+                self._vocab_q.add_sentence(pair["question"])
 
                 for ans in pair["answers"]:
-                    self._ans_vocab.add_sentence(ans)
+                    self._vocab_a.add_sentence(ans)
 
     def _process_qa(self):
-        with open(self._qa_json) as f:
+        with open(self._qa) as f:
             json_pairs = json.load(f)
             for pair in json_pairs:
                 q = pair["question"]
@@ -293,16 +303,16 @@ class Daquar(Dataset):
                 self._answers[pair["image_id"]] = self._encode_answers(a)
 
     def _encode_question(self, question):
-        vec = torch.zeros(self._vocab._longest_sentence).long()
+        vec = torch.zeros(self._vocab_q._longest_sentence).long()
         for i, token in enumerate(question.split(" ")):
-            vec[i] = self._vocab.to_index(token)
+            vec[i] = self._vocab_q.to_index(token)
 
         return vec
 
     def _encode_answers(self, answers):
-        vec = torch.zeros(self._ans_vocab._num_words)
+        vec = torch.zeros(self._vocab_a._num_words)
         for ans in answers:
-            idx = self._ans_vocab.to_index(ans)
+            idx = self._vocab_a.to_index(ans)
             if idx is not None:
                 vec[idx] = 1
 
@@ -319,17 +329,18 @@ class Daquar(Dataset):
         return the item from the dataset
         """
         v = self.transform(
-            Image.open(os.path.join(self._images, self.total_imgs[idx])).convert("RGB")
+            Image.open(os.path.join(self._im, self.total_imgs[idx])).convert("RGB")
         )
         image_id = self.total_imgs[idx].split("image")[-1].split(".png")[0]
         if image_id not in self._questions.keys():
             return (
                 v,
-                torch.zeros(self._vocab._longest_sentence),
+                torch.zeros(self._vocab_q._longest_sentence),
                 self._encode_answers([]),
             )
 
         q = self._questions[image_id]
         a = self._answers[image_id]
+
         # return v, q, a
         return v, q, a
