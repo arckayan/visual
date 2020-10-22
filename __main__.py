@@ -42,3 +42,6 @@ if __name__ == "__main__":
     dataset = fryday_ds.Daquar(datafolder, transform)
 
     trainloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE)
+
+    for batch_idx, (v, q, a) in enumerate(trainloader):
+        print(len(q))

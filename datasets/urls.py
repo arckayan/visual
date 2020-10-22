@@ -36,3 +36,25 @@ DAQUAR_URLS = {
     DAQUAR_IM       : "http://datasets.d2.mpi-inf.mpg.de/mateusz14visual-turing/nyu_depth_images.tar",
 }
 
+###############################################################################
+#
+#   VQA dataset urls
+# 
+###############################################################################
+VQA_QA           = 'qa'
+VQA_QA_TEST      = 'qa_test'
+VQA_QA_TRAIN     = 'qa_train'
+
+VQA_IM           = 'im'
+VQA_IM_TEST      = 'im_test'
+VQA_IM_TRAIN     = 'im_train'
+VQA_QA_Q         = 'im_qa_train'
+VQA_QA_ANOT      = 'im_qa_anot'
+
+
+VQA_URLS = {
+    VQA_QA_ANOT  : "https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/Annotations_Train_mscoco.zip",
+    VQA_QA_Q     : "https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/Questions_Train_mscoco.zip",
+    VQA_IM       : "http://images.cocodataset.org/zips/train2014.zip",
+}
+
