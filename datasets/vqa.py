@@ -24,7 +24,7 @@ from torch.utils.data import Dataset
 
 from log import _P, _L, _S
 from datasets.vocabulary import Vocabulary
-from datasets.downloader import wget
+from datasets.downloader import wget, unzip
 from datasets.urls import VqaUrl
 
 class VqaDataFolder:
@@ -33,7 +33,7 @@ class VqaDataFolder:
     download images, question answer pairs and json files.
     """
 
-    def __init__(self, path="./data/vqa", train=True, force=True, verbose=False):
+    def __init__(self, path="./data/vqa", urls=VqaUrl, train=True, force=True, verbose=False):
         """Construct a brand new VQA Data Folder
 
         Args:
@@ -44,123 +44,72 @@ class VqaDataFolder:
         """
         self._path = os.path.abspath(path)
         self._train = train
-        self._test = ~train
+        self._test = False if train else True
         self._force = force
         self._verbose = verbose
-        self._downloader = wget
-        self.urls = VqaUrl
+        self.urls = urls
 
         if self._force or not os.path.exists(self._path):
             self._download()
+            self._extract()
 
     def _download(self):
         self._VL("Downloading " + _P("VQA") + " in " + _S(self._path))
 
         if self._train:
             self._VL("Downloading Training split for the dataset")
-            self._downloader(self.urls.Train.annotations, self._path)
-            self._downloader(self.urls.Train.questions, self._path)
-            self._downloader(self.urls.Train.images, self._path)
+            wget(self.urls.Train.annotations, self._path)
+            wget(self.urls.Train.questions, self._path)
+            wget(self.urls.Train.images, self._path)
 
         if self._test:
             self._VL("Downloading Testing split for the dataset")
-            self._downloader(self.urls.Test.questions, self._path)
-            self._downloader(self.urls.Test.images, self._path)
+            wget(self.urls.Test.questions, self._path)
+            wget(self.urls.Test.images, self._path)
 
         self._VL("Downloading Validation split for the dataset")
-        self._downloader(self.urls.Validation.annotations, self._path)
-        self._downloader(self.urls.Validation.questions, self._path)
-        self._downloader(self.urls.Validation.images, self._path)
-
-
-        """
-        self._PROCESSED_QO_TRAIN = "OpenEnded_mscoco_train2014_questions.json"
-        self._PROCESSED_QM_TRAIN = "MultipleChoice_mscoco_train2014_questions.json"
-        self._PROCESSED_AN_TRAIN = "mscoco_train2014_annotations.json"
-        self._PROCESSED_IM_TRAIN = "train_images"
-
-        # Paths for files downloaded during processing (these paths are for
-        # processing purpose only will not be returned as result)
-
-        # zip file name containing all the images
-        self._zip_im_fullname = self._urls[VQA_IM].split("/")[-1]  # .zip
-        self._zip_im_name = self._zip_im_fullname.split(".")[0]
-        self._zip_im_path = self._abspath(self._zip_im_fullname)
-
-        # zip file for annotations
-        self._zip_an_fullname = self._urls[VQA_QA_ANOT].split("/")[-1]
-        self._zip_an_name = self._zip_an_fullname.split(".")[0]
-        self._zip_an_path = self._abspath(self._zip_an_fullname)
-
-        # zip file for questions
-        self._zip_q_fullname = self._urls[VQA_QA_Q].split("/")[-1]
-        self._zip_q_name = self._zip_q_fullname.split(".")[0]
-        self._zip_q_path = self._abspath(self._zip_q_fullname)
-
-        self._dir_im_extracted_train = self._abspath(self._zip_im_name)
-
-        # outputs
-        self._dir_im_train = self._abspath(self._PROCESSED_IM_TRAIN)
-        self._json_qo_train = self._abspath(self._PROCESSED_QO_TRAIN)
-        self._json_qm_train = self._abspath(self._PROCESSED_QM_TRAIN)
-        self._json_an_train = self._abspath(self._PROCESSED_AN_TRAIN)
-
-        # if self._force or (
-        #     not os.path.exists(self._dir_im_test)
-        #     and not os.path.exists(self._dir_im_train)
-        # ):
-        if self._force or (not os.path.exists(self._dir_im_train)):
-            self._download()
-            # self._extract()
-            # self._resolve_dirs()
-
-    # useable api for the class
-
-    def paths(self):
-        if self._train:
-            return (
-                self._dir_im_train,
-                self._json_qm_train,
-                self._json_qo_train,
-                self._json_an_train,
-            )
-        else:
-            return None
-        #     return self._dir_im_test, self._json_test
-
-    # Helper functions
-
-    def _download(self):
-        self._VL("Downloading " + _P("VQA") + " in " + _S(self._path))
-        download_dataset(self._urls, self._path)
+        wget(self.urls.Validation.annotations, self._path)
+        wget(self.urls.Validation.questions, self._path)
+        wget(self.urls.Validation.images, self._path)
 
     def _extract(self):
-        self._VL("Extracting the zips in " + _P(self._abspath()))
+        self._VL("Extracting the zips in " + _P(self._path))
+        if self._train:
+            self._VL("Extracting Training split for the dataset")
+            unzip(os.path.join(self._path, self.urls.Train.file_an),self._path)
+            unzip(os.path.join(self._path, self.urls.Train.file_qn),self._path)
+            unzip(os.path.join(self._path, self.urls.Train.file_im),self._path)
 
-        # extract with output according to the verbosity
-        zips = [self._zip_im_path, self._zip_an_path, self._zip_q_path]
-        for z in zips:
-            self._VL("Extracting - " + _P(z))
-            os.system(
-                "unzip {} -d {} {}".format(
-                    z, self._path, ">/dev/null 2>&1" if self._verbose < 2 else " ",
-                )
+        if self._test:
+            self._VL("Extracting Testing split for the dataset")
+            unzip(os.path.join(self._path, self.urls.Test.file_qn), self._path)
+            unzip(os.path.join(self._path, self.urls.Test.file_im),self._path)
+
+        self._VL("Extracting Validation split for the dataset")
+        unzip(os.path.join(self._path, self.urls.Validation.file_an),self._path)
+        unzip(os.path.join(self._path, self.urls.Validation.file_qn),self._path)
+        unzip(os.path.join(self._path, self.urls.Validation.file_im),self._path)
+
+    def paths(self):
+        if self._test:
+            raise "Not implemented, yet"
+        elif self._train:
+            return (
+                os.path.join(self._path, self.urls.Train.V),
+                os.path.join(self._path, self.urls.Train.Q),
+                os.path.join(self._path, self.urls.Train.A)
+            )
+        else:
+            return (
+                os.path.join(self._path, self.urls.Validation.V),
+                os.path.join(self._path, self.urls.Validation.Q),
+                os.path.join(self._path, self.urls.Validation.A)
             )
 
-    def _resolve_dirs(self):
-        self._VL("Resolving directories, deleting old and creating new")
-
-        # Rename the intermediate folder to test_images
-        os.system("mv {} {}".format(self._dir_im_extracted_train, self._dir_im_train))
-        """
     def _VL(self, log):
         # print the log according to the given verbosity
         if self._verbose:
             _L(log)
-
-    def _abspath(self, path=""):
-        # Return the absolute path after joining with the data folder path
-        return os.path.join(self._path, path)
 
 
 ###############################################################################
@@ -171,9 +120,9 @@ class VqaDataFolder:
 ###############################################################################
 
 
-class VQA(Dataset):
+class Vqa(Dataset):
     """
-    VQA Dataset
+    Vqa Dataset
 
     Args:
         Dataset (Dataset): Pytorch's dataset
@@ -186,88 +135,76 @@ class VQA(Dataset):
             datafolder (DataFolder): path pointing to dataset folder
             transform : transformer for the images
         """
-        super(VQA, self).__init__()
-        im, qm, qo, an = datafolder.paths()
-
-        self._im = im
-        self._qm = qm
-        self._qo = qo
-        self._an = an
-
+        super(Vqa, self).__init__()
+        self.V, self.Q, self.A = datafolder.paths()
         self.transform = transform
-
-        with open(self._qo, "r") as qo_f:
-            qo_josn = json.load(qo_f)
-            self._qo_tuples = qo_josn["questions"]
-        with open(self._an, "r") as an_f:
-            an_josn = json.load(an_f)
-            self._an_tuples = an_josn["annotations"]
-
         self.questions = {}
+        self.questions_idx = []
         self.answers = {}
-        self.total_imgs = natsort.natsorted(os.listdir(self._im))
+        self.images = {}
+        self.vocab_q = Vocabulary("Q")
+        self.vocab_a = Vocabulary("A")
 
-        for qo in self._qo_tuples:
-            self.questions[qo["image_id"]] = qo
-        for an in self._an_tuples:
-            self.answers[an["image_id"]] = an
+        self.process_v()
+        self.process_q()
+        self.process_a()
 
-        self._vocab_qo = Vocabulary("qo")
-        self._vocab_an = Vocabulary("an")
+    def process_v(self):
+        for file in os.listdir(self.V):
+            if not file.endswith('.jpg'):
+                continue
+            id = int(file.split('_')[-1].split('.')[0])
+            self.images[id] = file
 
-        self._build_vocab()
+    def process_q(self):
+        with open(self.Q, 'r') as f:
+            question = json.load(f)['questions']
+            for q in question:
+                self.vocab_q.add_sentence(q['question'])
+                self.questions[q['question_id']] = q
 
-    def _build_vocab(self):
-        for qo in self._qo_tuples:
-            self._vocab_qo.add_sentence(qo["question"])
-        for an in self._an_tuples:
-            for a in an["answers"]:
-                self._vocab_an.add_sentence(a["answer"])
+        self.questions_idx = list(self.questions.keys())
+
+    def process_a(self):
+        with open(self.A, 'r') as f:
+            annotations = json.load(f)['annotations']
+            for a in annotations:
+                self.answers[a['question_id']] = a
+                for answer in a['answers']:
+                    self.vocab_a.add_word(answer['answer'])
 
     def _encode_question(self, question):
-        vec = torch.zeros(self._vocab_qo._longest_sentence).long()
+        vec = torch.zeros(self.vocab_q._longest_sentence).long()
         for i, token in enumerate(question.split(" ")):
-            vec[i] = self._vocab_qo.to_index(token)
+            vec[i] = self.vocab_q.to_index(token)
 
         return vec
 
     def _encode_answers(self, answers):
-        vec = torch.zeros(self._vocab_an._num_words)
-        for ans in answers:
-            a = ans['answer'].split(' ')
-            for _a in a:
-                idx = self._vocab_an.to_index(_a)
-                if idx is not None:
-                    vec[idx] = 1
-
+        vec = torch.zeros(self.vocab_a._num_words)
+        for answer in answers:
+            index = self.vocab_a.to_index(answer)
+            if index is not None:
+                vec[index] += 1
         return vec
 
     def __len__(self):
         """
         returns the length of the dataset
         """
-        return len(self.total_imgs)
+        return len(self.questions_idx)
 
     def __getitem__(self, idx):
         """
         return the item from the dataset
         COCO_train2014_000000581921
         """
+        id = self.questions_idx[idx]
+        question = self.questions[id]
+        path = os.path.join(self.V, self.images[int(question['image_id'])])
 
-        v = self.transform(
-            Image.open(os.path.join(self._im, self.total_imgs[idx])).convert("RGB")
-        )
+        V = self.transform(Image.open(path).convert("RGB"))
+        Q = self._encode_question(question['question'])
+        A = self._encode_answers([a['answer'] for a in self.answers[id]['answers']])
 
-        image_id = int(self.total_imgs[idx].split("_")[-1].lstrip("0").split(".jpg")[0])
-        if image_id not in self.questions.keys():
-            return -1, -1, -1
-            return (
-                v,
-                torch.zeros(self._vocab_qo._longest_sentence),
-                self._encode_answers([]),
-            )
-
-        q = self._encode_question(self.questions[image_id]["question"])
-        a = self._encode_answers(self.answers[image_id]['answers'])
-        return v, q, a
-
+        return V, Q, A

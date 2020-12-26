@@ -47,13 +47,31 @@ class VqaUrl:
         annotations = r"https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Annotations_Train_mscoco.zip"
         questions = r"https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Questions_Train_mscoco.zip"
         images = r"http://images.cocodataset.org/zips/train2014.zip"
+        # Names of the downloaded files
+        file_an = annotations.split("/")[-1]
+        file_qn = questions.split("/")[-1]
+        file_im = images.split("/")[-1]
+        # name of the extracted files
+        V = 'train2014'
+        Q = 'v2_OpenEnded_mscoco_train2014_questions.json'
+        A = 'v2_mscoco_train2014_annotations.json'
 
     class Validation:
         annotations = 'https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Annotations_Val_mscoco.zip'
         questions = 'https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Questions_Val_mscoco.zip'
         images = 'http://images.cocodataset.org/zips/val2014.zip'
+        # Names of the downloaded files
+        file_an = annotations.split("/")[-1]
+        file_qn = questions.split("/")[-1]
+        file_im = images.split("/")[-1]
+        # name of the extracted files
+        V = 'val2014'
+        Q = 'v2_OpenEnded_mscoco_val2014_questions.json'
+        A = 'v2_mscoco_val2014_annotations.json'
 
     class Test:
         questions = 'https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Questions_Test_mscoco.zip'
         images = 'http://images.cocodataset.org/zips/test2015.zip'
-
+        # Names of the downloaded files
+        file_qn = questions.split("/")[-1]
+        file_im = images.split("/")[-1]

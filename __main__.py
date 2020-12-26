@@ -43,6 +43,24 @@ if __name__ == "__main__":
     df = datasets.VqaDataFolder(force=args.download,
                                 verbose=args.verbose,
                                 train=args.train)
+    preprocess_batch_size = 64
+    image_size = 448  # scale shorter end of image to this size and centre crop
+    output_size = image_size // 32  # size of the feature maps after processing through a network
+    output_features = 2048  # number of feature maps thereof
+    central_fraction = 0.875  # only take this much of the centre when scaling and centre cropping
+
+    transform = transforms.Compose(
+        [
+            transforms.Resize(int(image_size / central_fraction)),
+            transforms.CenterCrop(image_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+    ds = datasets.Vqa(df, transform)
+    loader = torch.utils.data.DataLoader(ds, batch_size=BATCH_SIZE)
+    for batch in loader:
+        print(len(batch))
     # dataset = fryday_ds.Daquar(daquar_processed_paths, transform)
     # trainloader = torch.utils.data.DataLoader(
     #     dataset, batch_size=BATCH_SIZE, num_workers=0, shuffle=True
