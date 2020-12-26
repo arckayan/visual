@@ -10,8 +10,8 @@ import numpy as np
 # import torch.nn.functional as F
 # import torch.optim as optim
 
+import net
 import datasets
-
 # from tqdm import tqdm
 # from PIL import Image
 from torchvision import transforms
@@ -59,8 +59,14 @@ if __name__ == "__main__":
     )
     ds = datasets.Vqa(df, transform)
     loader = torch.utils.data.DataLoader(ds, batch_size=BATCH_SIZE)
+    model = net.vqa.Vqa()
+    if torch.cuda.is_available():
+        print("Using GPU")
+        model.to('cuda')
     for batch in loader:
-        print(len(batch))
+        y = model(batch)
+        print(y)
+        break
     # dataset = fryday_ds.Daquar(daquar_processed_paths, transform)
     # trainloader = torch.utils.data.DataLoader(
     #     dataset, batch_size=BATCH_SIZE, num_workers=0, shuffle=True

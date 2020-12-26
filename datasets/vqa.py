@@ -203,7 +203,7 @@ class Vqa(Dataset):
         question = self.questions[id]
         path = os.path.join(self.V, self.images[int(question['image_id'])])
 
-        V = self.transform(Image.open(path).convert("RGB"))
+        V = self.transform(Image.open(path))
         Q = self._encode_question(question['question'])
         A = self._encode_answers([a['answer'] for a in self.answers[id]['answers']])
 
