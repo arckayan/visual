@@ -41,20 +41,19 @@ DAQUAR_URLS = {
 #   VQA dataset urls
 # 
 ###############################################################################
-VQA_QA           = 'qa'
-VQA_QA_TEST      = 'qa_test'
-VQA_QA_TRAIN     = 'qa_train'
 
-VQA_IM           = 'im'
-VQA_IM_TEST      = 'im_test'
-VQA_IM_TRAIN     = 'im_train'
-VQA_QA_Q         = 'im_qa_train'
-VQA_QA_ANOT      = 'im_qa_anot'
+class VqaUrl:
+    class Train:
+        annotations = r"https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Annotations_Train_mscoco.zip"
+        questions = r"https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Questions_Train_mscoco.zip"
+        images = r"http://images.cocodataset.org/zips/train2014.zip"
 
+    class Validation:
+        annotations = 'https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Annotations_Val_mscoco.zip'
+        questions = 'https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Questions_Val_mscoco.zip'
+        images = 'http://images.cocodataset.org/zips/val2014.zip'
 
-VQA_URLS = {
-    VQA_QA_ANOT  : "https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/Annotations_Train_mscoco.zip",
-    VQA_QA_Q     : "https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/Questions_Train_mscoco.zip",
-    VQA_IM       : "http://images.cocodataset.org/zips/train2014.zip",
-}
+    class Test:
+        questions = 'https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa/v2_Questions_Test_mscoco.zip'
+        images = 'http://images.cocodataset.org/zips/test2015.zip'
 

@@ -19,11 +19,12 @@ import json
 import torch
 import natsort
 
+
 from PIL import Image
-from log import _P, _L, _S
 from torch.utils.data import Dataset
 
 # dataset modules developed as part of this resarch project
+from log import _P, _L, _S
 from datasets.vocabulary import Vocabulary
 
 # from datasets.downloader import download_dataset
@@ -254,7 +255,7 @@ class DaquarDataFolder:
 
 class Daquar(Dataset):
     """
-    DAQUAR dataset, more info can be found at
+    V
     """
 
     def __init__(self, datafolder, transform):

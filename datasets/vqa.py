@@ -1,307 +1,273 @@
+# Copyright (C) 2020 Manish Sahani <rec.manish.sahani@gmail.com>.
+#
+# This code is Licensed under the Apache License, Version 2.0 (the "License");
+# A copy of a License can be obtained at:
+#                 http://www.apache.org/licenses/LICENSE-2.0#
+#
+# you may not use this file except in compliance with the License.
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# --*= vqa.py =*----
+
 import os
 import json
-import torch
-import itertools
 import natsort
 
+import torch
 from PIL import Image
-from log import _P, _L, _S
 from torch.utils.data import Dataset
 
-from datasets import utils
-from datasets.downloader import download_dataset
-from datasets.urls import VQA_URLS
+from log import _P, _L, _S
+from datasets.vocabulary import Vocabulary
+from datasets.downloader import wget
+from datasets.urls import VqaUrl
 
-from collections import Counter
+class VqaDataFolder:
+    """
+    VqaDataFolder is the Handler for VQA dataset, includes the utilites to
+    download images, question answer pairs and json files.
+    """
 
-import re
+    def __init__(self, path="./data/vqa", train=True, force=True, verbose=False):
+        """Construct a brand new VQA Data Folder
 
-import h5py
-import torch
-import torch.utils.data as data
-import torchvision.transforms as transforms
-
-import config
-
-
-class VqaDataFolder():
-
-    def __init__(self, path = "./data/vqa"):
+        Args:
+            path (str, optional): folders path. Defaults to "./data/vqa".
+            train (bool, optional): for training set path. Defaults to True
+            force (bool, optional): to force download. Defaults to False.
+            verbose (bool, optional): detailed logs. Defaults to False.
+        """
         self._path = os.path.abspath(path)
-        self._urls = VQA_URLS
-        self._question_paths_open = "OpenEnded_mscoco_train2014_questions.json"
-        self._question_paths_multi = "MultipleChoice_mscoco_train2014_questions.json"
-        self._annotations = "mscoco_train2014_annotations.json"
-        self._train2014 = "train2014.zip"
-    
-        
-        self.paths = {
-            "multi_q": os.path.join(self._path, self._question_paths_multi),
-            "open_q": os.path.join(self._path, self._question_paths_open),
-            "train_images": os.path.join(self._path, self._train2014),
-            "annotations": os.path.join(self._path, self._annotations)
-        }
-        # self._download()
-        # self._extract()
-        self._preprocess()
+        self._train = train
+        self._test = ~train
+        self._force = force
+        self._verbose = verbose
+        self._downloader = wget
+        self.urls = VqaUrl
+
+        if self._force or not os.path.exists(self._path):
+            self._download()
 
     def _download(self):
+        self._VL("Downloading " + _P("VQA") + " in " + _S(self._path))
+
+        if self._train:
+            self._VL("Downloading Training split for the dataset")
+            self._downloader(self.urls.Train.annotations, self._path)
+            self._downloader(self.urls.Train.questions, self._path)
+            self._downloader(self.urls.Train.images, self._path)
+
+        if self._test:
+            self._VL("Downloading Testing split for the dataset")
+            self._downloader(self.urls.Test.questions, self._path)
+            self._downloader(self.urls.Test.images, self._path)
+
+        self._VL("Downloading Validation split for the dataset")
+        self._downloader(self.urls.Validation.annotations, self._path)
+        self._downloader(self.urls.Validation.questions, self._path)
+        self._downloader(self.urls.Validation.images, self._path)
+
+
+        """
+        self._PROCESSED_QO_TRAIN = "OpenEnded_mscoco_train2014_questions.json"
+        self._PROCESSED_QM_TRAIN = "MultipleChoice_mscoco_train2014_questions.json"
+        self._PROCESSED_AN_TRAIN = "mscoco_train2014_annotations.json"
+        self._PROCESSED_IM_TRAIN = "train_images"
+
+        # Paths for files downloaded during processing (these paths are for
+        # processing purpose only will not be returned as result)
+
+        # zip file name containing all the images
+        self._zip_im_fullname = self._urls[VQA_IM].split("/")[-1]  # .zip
+        self._zip_im_name = self._zip_im_fullname.split(".")[0]
+        self._zip_im_path = self._abspath(self._zip_im_fullname)
+
+        # zip file for annotations
+        self._zip_an_fullname = self._urls[VQA_QA_ANOT].split("/")[-1]
+        self._zip_an_name = self._zip_an_fullname.split(".")[0]
+        self._zip_an_path = self._abspath(self._zip_an_fullname)
+
+        # zip file for questions
+        self._zip_q_fullname = self._urls[VQA_QA_Q].split("/")[-1]
+        self._zip_q_name = self._zip_q_fullname.split(".")[0]
+        self._zip_q_path = self._abspath(self._zip_q_fullname)
+
+        self._dir_im_extracted_train = self._abspath(self._zip_im_name)
+
+        # outputs
+        self._dir_im_train = self._abspath(self._PROCESSED_IM_TRAIN)
+        self._json_qo_train = self._abspath(self._PROCESSED_QO_TRAIN)
+        self._json_qm_train = self._abspath(self._PROCESSED_QM_TRAIN)
+        self._json_an_train = self._abspath(self._PROCESSED_AN_TRAIN)
+
+        # if self._force or (
+        #     not os.path.exists(self._dir_im_test)
+        #     and not os.path.exists(self._dir_im_train)
+        # ):
+        if self._force or (not os.path.exists(self._dir_im_train)):
+            self._download()
+            # self._extract()
+            # self._resolve_dirs()
+
+    # useable api for the class
+
+    def paths(self):
+        if self._train:
+            return (
+                self._dir_im_train,
+                self._json_qm_train,
+                self._json_qo_train,
+                self._json_an_train,
+            )
+        else:
+            return None
+        #     return self._dir_im_test, self._json_test
+
+    # Helper functions
+
+    def _download(self):
+        self._VL("Downloading " + _P("VQA") + " in " + _S(self._path))
         download_dataset(self._urls, self._path)
 
-
     def _extract(self):
-        for key, value in self._urls.items():
-            os.system("unzip {}/{} -d {}".format(self._path, value.split("/")[-1], self._path))
-        
-    # def _preprocessing_question(self):
-    #     with open(os.path.join(self._path, self._question_paths_open)) as questions_open, open(os.path.join(self._path,self._question_paths_multi)) as questions_multi, open(os.path.join(self._path,self._annotations)) as annotations:
-    #         questions_multi = json.load(questions_multi)["questions"]
-    #         questions_open = json.load(questions_open)["questions"]   
-    #         annotations = json.load(annotations)["annotations"]
+        self._VL("Extracting the zips in " + _P(self._abspath()))
 
-    def _extract_vocab(self,iterable, top_k=None, start=0):
-        """ Turns an iterable of list of tokens into a vocabulary.
-            These tokens could be single answers or word tokens in questions.
+        # extract with output according to the verbosity
+        zips = [self._zip_im_path, self._zip_an_path, self._zip_q_path]
+        for z in zips:
+            self._VL("Extracting - " + _P(z))
+            os.system(
+                "unzip {} -d {} {}".format(
+                    z, self._path, ">/dev/null 2>&1" if self._verbose < 2 else " ",
+                )
+            )
+
+    def _resolve_dirs(self):
+        self._VL("Resolving directories, deleting old and creating new")
+
+        # Rename the intermediate folder to test_images
+        os.system("mv {} {}".format(self._dir_im_extracted_train, self._dir_im_train))
         """
-        all_tokens = itertools.chain.from_iterable(iterable)
-        counter = Counter(all_tokens)
-        if top_k:
-            most_common = counter.most_common(top_k)
-            most_common = (t for t, c in most_common)
-        else:
-            most_common = counter.keys()
-        # descending in count, then lexicographical order
-        tokens = sorted(most_common, key=lambda x: (counter[x], x), reverse=True)
-        vocab = {t: i for i, t in enumerate(tokens, start=start)}
-        return vocab
+    def _VL(self, log):
+        # print the log according to the given verbosity
+        if self._verbose:
+            _L(log)
+
+    def _abspath(self, path=""):
+        # Return the absolute path after joining with the data folder path
+        return os.path.join(self._path, path)
 
 
-    def _preprocess(self):
-        questions = utils.path_for(train=True, question=True)
-        answers = utils.path_for(train=True, answer=True)
-
-        print(questions)
-        print(answers)
-        with open(questions, 'r') as fd:
-            questions = json.load(fd)
-        with open(answers, 'r') as fd:
-            answers = json.load(fd)
-
-        questions = utils.prepare_questions(questions)
-        answers = utils.prepare_answers(answers)
-
-        question_vocab = self._extract_vocab(questions, start=1)
-        answer_vocab = self._extract_vocab(answers, top_k=config.max_answers)
-
-        vocabs = {
-            'question': question_vocab,
-            'answer': answer_vocab,
-        }
-        with open(config.vocabulary_path, 'w') as fd:
-            json.dump(vocabs, fd)
-
-    
+###############################################################################
+#
+#   VQA's handler for pytorch, with in-built vocabulary for processing the
+#   questions and answers.
+#
+###############################################################################
 
 
+class VQA(Dataset):
+    """
+    VQA Dataset
 
+    Args:
+        Dataset (Dataset): Pytorch's dataset
+    """
 
-def get_loader(train=False, val=False, test=False):
-    """ Returns a data loader for the desired split """
-    assert train + val + test == 1, 'need to set exactly one of {train, val, test} to True'
-    split = VQA(
-        utils.path_for(train=train, val=val, test=test, question=True),
-        utils.path_for(train=train, val=val, test=test, answer=True),
-        config.preprocessed_path,
-        answerable_only=train,
-    )
-    loader = torch.utils.data.DataLoader(
-        split,
-        batch_size=config.batch_size,
-        shuffle=train,  # only shuffle the data in training
-        pin_memory=True,
-        num_workers=config.data_workers,
-        collate_fn=collate_fn,
-    )
-    return loader
+    def __init__(self, datafolder, transform):
+        """Constructor for the VQA
 
-
-def collate_fn(batch):
-    # put question lengths in descending order so that we can use packed sequences later
-    batch.sort(key=lambda x: x[-1], reverse=True)
-    return data.dataloader.default_collate(batch)
-
-
-class VQA(data.Dataset):
-    """ VQA dataset, open-ended """
-    def __init__(self, questions_path, answers_path, image_features_path, answerable_only=False):
+        Args:
+            datafolder (DataFolder): path pointing to dataset folder
+            transform : transformer for the images
+        """
         super(VQA, self).__init__()
-        with open(questions_path, 'r') as fd:
-            questions_json = json.load(fd)
-        with open(answers_path, 'r') as fd:
-            answers_json = json.load(fd)
-        with open(config.vocabulary_path, 'r') as fd:
-            vocab_json = json.load(fd)
-        self._check_integrity(questions_json, answers_json)
+        im, qm, qo, an = datafolder.paths()
 
-        # vocab
-        self.vocab = vocab_json
-        self.token_to_index = self.vocab['question']
-        self.answer_to_index = self.vocab['answer']
+        self._im = im
+        self._qm = qm
+        self._qo = qo
+        self._an = an
 
-        # q and a
-        self.questions = list(utils.prepare_questions(questions_json))
-        self.answers = list(utils.prepare_answers(answers_json))
-        self.questions = [self._encode_question(q) for q in self.questions]
-        self.answers = [self._encode_answers(a) for a in self.answers]
-
-        # v
-        self.image_features_path = image_features_path
-        self.coco_id_to_index = self._create_coco_id_to_index()
-        self.coco_ids = [q['image_id'] for q in questions_json['questions']]
-
-        # only use questions that have at least one answer?
-        self.answerable_only = answerable_only
-        if self.answerable_only:
-            self.answerable = self._find_answerable()
-
-    @property
-    def max_question_length(self):
-        if not hasattr(self, '_max_length'):
-            self._max_length = max(map(len, self.questions))
-        return self._max_length
-
-    @property
-    def num_tokens(self):
-        return len(self.token_to_index) + 1  # add 1 for <unknown> token at index 0
-
-    def _create_coco_id_to_index(self):
-        """ Create a mapping from a COCO image id into the corresponding index into the h5 file """
-        with h5py.File(self.image_features_path, 'r') as features_file:
-            coco_ids = features_file['ids'][()]
-        coco_id_to_index = {id: i for i, id in enumerate(coco_ids)}
-        return coco_id_to_index
-
-    def _check_integrity(self, questions, answers):
-        """ Verify that we are using the correct data """
-        qa_pairs = list(zip(questions['questions'], answers['annotations']))
-        assert all(q['question_id'] == a['question_id'] for q, a in qa_pairs), 'Questions not aligned with answers'
-        assert all(q['image_id'] == a['image_id'] for q, a in qa_pairs), 'Image id of question and answer don\'t match'
-        assert questions['data_type'] == answers['data_type'], 'Mismatched data types'
-        assert questions['data_subtype'] == answers['data_subtype'], 'Mismatched data subtypes'
-
-    def _find_answerable(self):
-        """ Create a list of indices into questions that will have at least one answer that is in the vocab """
-        answerable = []
-        for i, answers in enumerate(self.answers):
-            answer_has_index = len(answers.nonzero()) > 0
-            # store the indices of anything that is answerable
-            if answer_has_index:
-                answerable.append(i)
-        return answerable
-
-    def _encode_question(self, question):
-        """ Turn a question into a vector of indices and a question length """
-        vec = torch.zeros(self.max_question_length).long()
-        for i, token in enumerate(question):
-            index = self.token_to_index.get(token, 0)
-            vec[i] = index
-        return vec, len(question)
-
-    def _encode_answers(self, answers):
-        """ Turn an answer into a vector """
-        # answer vec will be a vector of answer counts to determine which answers will contribute to the loss.
-        # this should be multiplied with 0.1 * negative log-likelihoods that a model produces and then summed up
-        # to get the loss that is weighted by how many humans gave that answer
-        answer_vec = torch.zeros(len(self.answer_to_index))
-        for answer in answers:
-            index = self.answer_to_index.get(answer)
-            if index is not None:
-                answer_vec[index] += 1
-        return answer_vec
-
-    def _load_image(self, image_id):
-        """ Load an image """
-        if not hasattr(self, 'features_file'):
-            # Loading the h5 file has to be done here and not in __init__ because when the DataLoader
-            # forks for multiple works, every child would use the same file object and fail
-            # Having multiple readers using different file objects is fine though, so we just init in here.
-            self.features_file = h5py.File(self.image_features_path, 'r')
-        index = self.coco_id_to_index[image_id]
-        dataset = self.features_file['features']
-        img = dataset[index].astype('float32')
-        return torch.from_numpy(img)
-
-    def __getitem__(self, item):
-        if self.answerable_only:
-            # change of indices to only address answerable questions
-            item = self.answerable[item]
-
-        q, q_length = self.questions[item]
-        a = self.answers[item]
-        image_id = self.coco_ids[item]
-        v = self._load_image(image_id)
-        # since batches are re-ordered for PackedSequence's, the original question order is lost
-        # we return `item` so that the order of (v, q, a) triples can be restored if desired
-        # without shuffling in the dataloader, these will be in the order that they appear in the q and a json's.
-        return v, q, a, item, q_length
-
-    def __len__(self):
-        if self.answerable_only:
-            return len(self.answerable)
-        else:
-            return len(self.questions)
-
-
-
-class CocoImages(data.Dataset):
-    """ Dataset for MSCOCO images located in a folder on the filesystem """
-    def __init__(self, path, transform=None):
-        super(CocoImages, self).__init__()
-        self.path = path
-        self.id_to_filename = self._find_images()
-        self.sorted_ids = sorted(self.id_to_filename.keys())  # used for deterministic iteration order
-        print('found {} images in {}'.format(len(self), self.path))
         self.transform = transform
 
-    def _find_images(self):
-        id_to_filename = {}
-        for filename in os.listdir(self.path):
-            if not filename.endswith('.jpg'):
-                continue
-            id_and_extension = filename.split('_')[-1]
-            id = int(id_and_extension.split('.')[0])
-            id_to_filename[id] = filename
-        return id_to_filename
+        with open(self._qo, "r") as qo_f:
+            qo_josn = json.load(qo_f)
+            self._qo_tuples = qo_josn["questions"]
+        with open(self._an, "r") as an_f:
+            an_josn = json.load(an_f)
+            self._an_tuples = an_josn["annotations"]
 
-    def __getitem__(self, item):
-        id = self.sorted_ids[item]
-        path = os.path.join(self.path, self.id_to_filename[id])
-        img = Image.open(path).convert('RGB')
+        self.questions = {}
+        self.answers = {}
+        self.total_imgs = natsort.natsorted(os.listdir(self._im))
 
-        if self.transform is not None:
-            img = self.transform(img)
-        return id, img
+        for qo in self._qo_tuples:
+            self.questions[qo["image_id"]] = qo
+        for an in self._an_tuples:
+            self.answers[an["image_id"]] = an
+
+        self._vocab_qo = Vocabulary("qo")
+        self._vocab_an = Vocabulary("an")
+
+        self._build_vocab()
+
+    def _build_vocab(self):
+        for qo in self._qo_tuples:
+            self._vocab_qo.add_sentence(qo["question"])
+        for an in self._an_tuples:
+            for a in an["answers"]:
+                self._vocab_an.add_sentence(a["answer"])
+
+    def _encode_question(self, question):
+        vec = torch.zeros(self._vocab_qo._longest_sentence).long()
+        for i, token in enumerate(question.split(" ")):
+            vec[i] = self._vocab_qo.to_index(token)
+
+        return vec
+
+    def _encode_answers(self, answers):
+        vec = torch.zeros(self._vocab_an._num_words)
+        for ans in answers:
+            a = ans['answer'].split(' ')
+            for _a in a:
+                idx = self._vocab_an.to_index(_a)
+                if idx is not None:
+                    vec[idx] = 1
+
+        return vec
 
     def __len__(self):
-        return len(self.sorted_ids)
+        """
+        returns the length of the dataset
+        """
+        return len(self.total_imgs)
 
+    def __getitem__(self, idx):
+        """
+        return the item from the dataset
+        COCO_train2014_000000581921
+        """
 
-class Composite(data.Dataset):
-    """ Dataset that is a composite of several Dataset objects. Useful for combining splits of a dataset. """
-    def __init__(self, *datasets):
-        self.datasets = datasets
+        v = self.transform(
+            Image.open(os.path.join(self._im, self.total_imgs[idx])).convert("RGB")
+        )
 
-    def __getitem__(self, item):
-        current = self.datasets[0]
-        for d in self.datasets:
-            if item < len(d):
-                return d[item]
-            item -= len(d)
-        else:
-            raise IndexError('Index too large for composite dataset')
+        image_id = int(self.total_imgs[idx].split("_")[-1].lstrip("0").split(".jpg")[0])
+        if image_id not in self.questions.keys():
+            return -1, -1, -1
+            return (
+                v,
+                torch.zeros(self._vocab_qo._longest_sentence),
+                self._encode_answers([]),
+            )
 
-    def __len__(self):
-        return sum(map(len, self.datasets))
+        q = self._encode_question(self.questions[image_id]["question"])
+        a = self._encode_answers(self.answers[image_id]['answers'])
+        return v, q, a
 
-
-        
