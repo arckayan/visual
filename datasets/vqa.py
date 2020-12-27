@@ -16,7 +16,6 @@
 
 import os
 import json
-import natsort
 
 import torch
 from PIL import Image
@@ -27,89 +26,104 @@ from datasets.vocabulary import Vocabulary
 from datasets.downloader import wget, unzip
 from datasets.urls import VqaUrl
 
-class VqaDataFolder:
+class DataFolder:
     """
     VqaDataFolder is the Handler for VQA dataset, includes the utilites to
     download images, question answer pairs and json files.
     """
 
-    def __init__(self, path="./data/vqa", urls=VqaUrl, train=True, force=True, verbose=False):
+    def __init__(self, path="./data/vqa", urls=VqaUrl, split='valid', verbose=False):
         """Construct a brand new VQA Data Folder
 
         Args:
             path (str, optional): folders path. Defaults to "./data/vqa".
-            train (bool, optional): for training set path. Defaults to True
-            force (bool, optional): to force download. Defaults to False.
+            split (str, optional): for training set path. Defaults to valid
             verbose (bool, optional): detailed logs. Defaults to False.
         """
-        self._path = os.path.abspath(path)
-        self._train = train
-        self._test = False if train else True
-        self._force = force
-        self._verbose = verbose
+        self.path = os.path.abspath(path)
+        self.split = split
         self.urls = urls
+        self._verbose = verbose
 
-        if self._force or not os.path.exists(self._path):
+        if False in [os.path.exists(p) for p in self.paths()]:
             self._download()
             self._extract()
 
     def _download(self):
-        self._VL("Downloading " + _P("VQA") + " in " + _S(self._path))
+        self._VL("Downloading " + _P("VQA") + " in " + _S(self.path))
 
-        if self._train:
+        if self.split == 'train':
             self._VL("Downloading Training split for the dataset")
-            wget(self.urls.Train.annotations, self._path)
-            wget(self.urls.Train.questions, self._path)
-            wget(self.urls.Train.images, self._path)
-
-        if self._test:
+            wget(self.urls.Train.annotations, self.path)
+            wget(self.urls.Train.questions, self.path)
+            wget(self.urls.Train.images, self.path)
+        elif self.split == 'test':
             self._VL("Downloading Testing split for the dataset")
-            wget(self.urls.Test.questions, self._path)
-            wget(self.urls.Test.images, self._path)
-
-        self._VL("Downloading Validation split for the dataset")
-        wget(self.urls.Validation.annotations, self._path)
-        wget(self.urls.Validation.questions, self._path)
-        wget(self.urls.Validation.images, self._path)
+            wget(self.urls.Test.questions, self.path)
+            wget(self.urls.Test.images, self.path)
+        else:
+            self._VL("Downloading Validation split for the dataset")
+            wget(self.urls.Validation.annotations, self.path)
+            wget(self.urls.Validation.questions, self.path)
+            wget(self.urls.Validation.images, self.path)
 
     def _extract(self):
-        self._VL("Extracting the zips in " + _P(self._path))
-        if self._train:
+        self._VL("Extracting the zips in " + _P(self.path))
+
+        if self.split == 'train':
             self._VL("Extracting Training split for the dataset")
-            unzip(os.path.join(self._path, self.urls.Train.file_an),self._path)
-            unzip(os.path.join(self._path, self.urls.Train.file_qn),self._path)
-            unzip(os.path.join(self._path, self.urls.Train.file_im),self._path)
-
-        if self._test:
+            unzip(os.path.join(self.path, self.urls.Train.file_an),self.path)
+            unzip(os.path.join(self.path, self.urls.Train.file_qn),self.path)
+            unzip(os.path.join(self.path, self.urls.Train.file_im),self.path)
+        elif self.split == 'test':
             self._VL("Extracting Testing split for the dataset")
-            unzip(os.path.join(self._path, self.urls.Test.file_qn), self._path)
-            unzip(os.path.join(self._path, self.urls.Test.file_im),self._path)
-
-        self._VL("Extracting Validation split for the dataset")
-        unzip(os.path.join(self._path, self.urls.Validation.file_an),self._path)
-        unzip(os.path.join(self._path, self.urls.Validation.file_qn),self._path)
-        unzip(os.path.join(self._path, self.urls.Validation.file_im),self._path)
+            unzip(os.path.join(self.path, self.urls.Test.file_qn), self.path)
+            unzip(os.path.join(self.path, self.urls.Test.file_im),self.path)
+        else:
+            self._VL("Extracting Validation split for the dataset")
+            unzip(os.path.join(self.path, self.urls.Validation.file_an),self.path)
+            unzip(os.path.join(self.path, self.urls.Validation.file_qn),self.path)
+            unzip(os.path.join(self.path, self.urls.Validation.file_im),self.path)
 
     def paths(self):
-        if self._test:
-            raise "Not implemented, yet"
-        elif self._train:
+        if self.split == 'train':
             return (
-                os.path.join(self._path, self.urls.Train.V),
-                os.path.join(self._path, self.urls.Train.Q),
-                os.path.join(self._path, self.urls.Train.A)
+                os.path.join(self.path, self.urls.Train.V),
+                os.path.join(self.path, self.urls.Train.Q),
+                os.path.join(self.path, self.urls.Train.A)
+            )
+        elif self.split == 'test':
+            return (
+                os.path.join(self.path, self.urls.Test.V),
+                os.path.join(self.path, self.urls.Test.Q)
             )
         else:
             return (
-                os.path.join(self._path, self.urls.Validation.V),
-                os.path.join(self._path, self.urls.Validation.Q),
-                os.path.join(self._path, self.urls.Validation.A)
+                os.path.join(self.path, self.urls.Validation.V),
+                os.path.join(self.path, self.urls.Validation.Q),
+                os.path.join(self.path, self.urls.Validation.A)
             )
 
     def _VL(self, log):
         # print the log according to the given verbosity
         if self._verbose:
             _L(log)
+
+class Processed:
+    """
+    ProcessedVqa is the handler for h5py files, in which Image features are
+    extracted using resnet.
+    """
+    def __init__(self, df, transform):
+        self.V, self.Q, self.A = df.paths() # only V is used here
+        self._path = df.rootdir()
+        self.images = {}
+
+    def process_v(self):
+        for file in os.listdir(self.V):
+            if not file.endswith('.jpg'): continue
+
+            id = int(file.split('_')[-1].split('.')[0])
 
 
 ###############################################################################

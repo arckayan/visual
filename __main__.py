@@ -1,9 +1,6 @@
-from __future__ import print_function
-
 # import os
-import torch
 import argparse
-import numpy as np
+import torch
 
 # import torchvision
 # import torch.nn as nn
@@ -12,51 +9,81 @@ import numpy as np
 
 import net
 import datasets
+import utils
 # from tqdm import tqdm
 # from PIL import Image
-from torchvision import transforms
-import torchvision.transforms.functional as F
 
 # from datasets.vocabulary import Vocabulary
 
 BATCH_SIZE = 64
 
 parser = argparse.ArgumentParser()
+
+parser.add_argument("--preprocess",
+                    action="store_true",
+                    help="preprocess the images and extract features using resnet")
 parser.add_argument("--download",
                     action="store_true",
                     help="force download the dataset")
-
 parser.add_argument("--verbose",
                     type=int,
-                    help="set output verbosity",
-                    default=0)
-
-parser.add_argument("--train",
-                    action="store_true",
+                    default=0,
+                    help="set output verbosity")
+parser.add_argument("--split",
+                    default='valid',
                     help="use the train dataset")
+parser.add_argument("--batch-size",
+                    type=int,
+                    default=64,
+                    help="size of the batchs used for training")
+parser.add_argument("--image-size",
+                    type=int,
+                    default=448,
+                    help="size of the input image to be fed into NN.")
+parser.add_argument("--central-fraction",
+                    type=int,
+                    default=0.875,
+                    help="Only take this much of the centre when scaling and cropping")
+parser.add_argument("--num-workers",
+                    type=int,
+                    default=8,
+                    help="specifies the number of workers for the dataloader")
 
 if __name__ == "__main__":
-    # ---------------------- Commander for the program -----------------------#
 
     args = parser.parse_args()
+    OUTPUT_SIZE = args.image_size // 32
+    OUTPUT_FEATURES = 2048 # same as number of features
 
-    df = datasets.VqaDataFolder(force=args.download,
-                                verbose=args.verbose,
-                                train=args.train)
+    if args.preprocess:
+        train_df = datasets.vqa.DataFolder(split='train')
+        valid_df = datasets.vqa.DataFolder(split='valid')
+
+        transform = utils.create_transform(args.image_size, args.central_fraction)
+        df = utils.coco_composite(transform, [train_df, valid_df])
+        dl = torch.utils.data.DataLoader(df,
+                                         shuffle=False,
+                                         batch_size=args.batch_size,
+                                         num_workers=args.num_workers,
+                                         pin_memory=True)
+
+        model = net.Resnet()
+        model.eval()
+        for batch in dl:
+            from datetime import datetime
+            print(datetime.now())
+            #y = model(batch)
+            print(y)
+            print(datetime.now())
+
+            break
+    """
     preprocess_batch_size = 64
     image_size = 448  # scale shorter end of image to this size and centre crop
     output_size = image_size // 32  # size of the feature maps after processing through a network
     output_features = 2048  # number of feature maps thereof
     central_fraction = 0.875  # only take this much of the centre when scaling and centre cropping
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize(int(image_size / central_fraction)),
-            transforms.CenterCrop(image_size),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]
-    )
     ds = datasets.Vqa(df, transform)
     loader = torch.utils.data.DataLoader(ds, batch_size=BATCH_SIZE)
     model = net.vqa.Vqa()
@@ -71,7 +98,6 @@ if __name__ == "__main__":
     # trainloader = torch.utils.data.DataLoader(
     #     dataset, batch_size=BATCH_SIZE, num_workers=0, shuffle=True
     # )
-    """
     image_size = (480, 640)
     transform = transforms.Compose(
         [

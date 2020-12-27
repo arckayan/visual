@@ -75,3 +75,6 @@ class VqaUrl:
         # Names of the downloaded files
         file_qn = questions.split("/")[-1]
         file_im = images.split("/")[-1]
+        # name of the extracted files
+        V = 'test2015'
+        Q = 'v2_OpenEnded_mscoco_test2015_questions.json'
