@@ -38,12 +38,12 @@ class Coco(data.Dataset):
 
     def __getitem__(self, idx):
         id = self.ids[idx]
-        image = Image.open(os.path.join(self.path, self.images[id]))
+        image = Image.open(os.path.join(self.path, self.images[id])).convert('RGB')
 
         if self.transform:
             image = self.transform(image)
 
-        return image
+        return id, image
 
 class Composite(data.Dataset):
     def __init__(self, *datasets):

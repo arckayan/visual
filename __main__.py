@@ -6,10 +6,11 @@ import torch
 # import torch.nn as nn
 # import torch.nn.functional as F
 # import torch.optim as optim
-
+import h5py
 import net
 import datasets
 import utils
+from tqdm import tqdm
 # from tqdm import tqdm
 # from PIL import Image
 
@@ -51,6 +52,7 @@ parser.add_argument("--num-workers",
 
 if __name__ == "__main__":
 
+    print("Running the __main__")
     args = parser.parse_args()
     OUTPUT_SIZE = args.image_size // 32
     OUTPUT_FEATURES = 2048 # same as number of features
@@ -67,16 +69,27 @@ if __name__ == "__main__":
                                          num_workers=args.num_workers,
                                          pin_memory=True)
 
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         model = net.Resnet()
+        model.to(device)
         model.eval()
-        for batch in dl:
-            from datetime import datetime
-            print(datetime.now())
-            #y = model(batch)
-            print(y)
-            print(datetime.now())
-
-            break
+        features_shape = (
+            len(dl.dataset),
+            OUTPUT_FEATURES,
+            OUTPUT_SIZE,
+            OUTPUT_SIZE
+        )
+        with h5py.File('./resnet14x14.h5', libver='latest') as fd:
+            features = fd.create_dataset('features', shape=features_shape, dtype='float16')
+            coco_ids = fd.create_dataset('ids', shape=(len(dl.dataset),), dtype='int32')
+            i = j = 0
+            for ids, imgs in tqdm(dl):
+                imgs = imgs.cuda().clone().detach().requires_grad_(True)
+                out = model(imgs)
+                j = i + imgs.size(0)
+                features[i:j, :, :] = out.data.cpu().numpy().astype('float16')
+                coco_ids[i:j] = ids.numpy().astype('int32')
+                i = j
     """
     preprocess_batch_size = 64
     image_size = 448  # scale shorter end of image to this size and centre crop
