@@ -1,63 +1,71 @@
-# import os
+# Copyright (C) 2020 Manish Sahani <rec.manish.sahani@gmail.com>.
+#
+# This code is Licensed under the Apache License, Version 2.0 (the "License");
+# A copy of a License can be obtained at:
+#                 http://www.apache.org/licenses/LICENSE-2.0#
+#
+# you may not use this file except in compliance with the License.
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# --*= __main__.py =*----
+
 import argparse
+import h5py
 import torch
 
-# import torchvision
-# import torch.nn as nn
-# import torch.nn.functional as F
-# import torch.optim as optim
-import h5py
 import net
 import datasets
 import utils
+
 from tqdm import tqdm
-# from tqdm import tqdm
-# from PIL import Image
-
-# from datasets.vocabulary import Vocabulary
-
-BATCH_SIZE = 64
-
-parser = argparse.ArgumentParser()
-
-parser.add_argument("--preprocess",
-                    action="store_true",
-                    help="preprocess the images and extract features using resnet")
-parser.add_argument("--download",
-                    action="store_true",
-                    help="force download the dataset")
-parser.add_argument("--verbose",
-                    type=int,
-                    default=0,
-                    help="set output verbosity")
-parser.add_argument("--split",
-                    default='valid',
-                    help="use the train dataset")
-parser.add_argument("--batch-size",
-                    type=int,
-                    default=64,
-                    help="size of the batchs used for training")
-parser.add_argument("--image-size",
-                    type=int,
-                    default=448,
-                    help="size of the input image to be fed into NN.")
-parser.add_argument("--central-fraction",
-                    type=int,
-                    default=0.875,
-                    help="Only take this much of the centre when scaling and cropping")
-parser.add_argument("--num-workers",
-                    type=int,
-                    default=8,
-                    help="specifies the number of workers for the dataloader")
 
 if __name__ == "__main__":
 
-    print("Running the __main__")
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--preprocess",
+                        action="store_true",
+                        help="preprocess the images and extract features using resnet")
+    parser.add_argument("--download",
+                        action="store_true",
+                        help="force download the dataset")
+    parser.add_argument("--verbose",
+                        type=int,
+                        default=0,
+                        help="set output verbosity")
+    parser.add_argument("--split",
+                        default='valid',
+                        help="use the train dataset")
+    parser.add_argument("--batch-size",
+                        type=int,
+                        default=64,
+                        help="size of the batchs used for training")
+    parser.add_argument("--image-size",
+                        type=int,
+                        default=448,
+                        help="size of the input image to be fed into NN.")
+    parser.add_argument("--central-fraction",
+                        type=int,
+                        default=0.875,
+                        help="Only take this much of the centre when scaling and cropping")
+    parser.add_argument("--num-workers",
+                        type=int,
+                        default=8,
+                        help="specifies the number of workers for the dataloader")
+
     args = parser.parse_args()
     OUTPUT_SIZE = args.image_size // 32
     OUTPUT_FEATURES = 2048 # same as number of features
 
-    if args.preprocess:
+    if args.download:
+        ds = datasets.vqa.DataFolder(split=args.split)
+
+    elif args.preprocess:
         train_df = datasets.vqa.DataFolder(split='train')
         valid_df = datasets.vqa.DataFolder(split='valid')
 
@@ -90,6 +98,13 @@ if __name__ == "__main__":
                 features[i:j, :, :] = out.data.cpu().numpy().astype('float16')
                 coco_ids[i:j] = ids.numpy().astype('int32')
                 i = j
+    else:
+        df = datasets.vqa.DataFolder(split=args.split)
+        tf = utils.create_transform(args.image_size, args.central_fraction)
+        ds = datasets.vqa.RawVqa(df, tf)
+        for x in ds:
+            print(x[2].shape)
+            break
     """
     preprocess_batch_size = 64
     image_size = 448  # scale shorter end of image to this size and centre crop
