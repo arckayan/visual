@@ -109,22 +109,6 @@ class DataFolder:
         if self._verbose:
             _L(log)
 
-class Processed:
-    """
-    ProcessedVqa is the handler for h5py files, in which Image features are
-    extracted using resnet.
-    """
-    def __init__(self, df, transform):
-        self.V, self.Q, self.A = df.paths() # only V is used here
-        self._path = df.rootdir()
-        self.images = {}
-
-    def process_v(self):
-        for file in os.listdir(self.V):
-            if not file.endswith('.jpg'): continue
-
-            id = int(file.split('_')[-1].split('.')[0])
-
 
 ###############################################################################
 #
@@ -134,22 +118,23 @@ class Processed:
 ###############################################################################
 
 
-class Vqa(Dataset):
+class RawVqa(Dataset):
     """
-    Vqa Dataset
+    RawVqa Dataset has the raw images instead of image features extracted pre-
+    viosuly in preprocessing.
 
     Args:
         Dataset (Dataset): Pytorch's dataset
     """
 
     def __init__(self, datafolder, transform):
-        """Constructor for the VQA
+        """Constructor for the RawVqa
 
         Args:
             datafolder (DataFolder): path pointing to dataset folder
             transform : transformer for the images
         """
-        super(Vqa, self).__init__()
+        super(RawVqa, self).__init__()
         self.V, self.Q, self.A = datafolder.paths()
         self.transform = transform
         self.questions = {}
@@ -211,13 +196,12 @@ class Vqa(Dataset):
     def __getitem__(self, idx):
         """
         return the item from the dataset
-        COCO_train2014_000000581921
         """
         id = self.questions_idx[idx]
         question = self.questions[id]
         path = os.path.join(self.V, self.images[int(question['image_id'])])
 
-        V = self.transform(Image.open(path))
+        V = self.transform(Image.open(path).convert('RGB'))
         Q = self._encode_question(question['question'])
         A = self._encode_answers([a['answer'] for a in self.answers[id]['answers']])
 
