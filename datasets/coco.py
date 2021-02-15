@@ -59,7 +59,6 @@ class Coco(data.Dataset):
 
         return id, image
 
-
 class CocoComposite(data.Dataset):
     def __init__(self, *datasets):
         self.datasets = datasets
