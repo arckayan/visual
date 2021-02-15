@@ -32,7 +32,10 @@ class DataFolder:
     download images, question answer pairs and json files.
     """
 
-    def __init__(self, path="./data/vqa", urls=VqaUrl, split='valid', verbose=False):
+    def __init__(self,
+                 path,
+                 split='valid',
+                 verbose=False):
         """Construct a brand new VQA Data Folder
 
         Args:
@@ -42,7 +45,7 @@ class DataFolder:
         """
         self.path = os.path.abspath(path)
         self.split = split
-        self.urls = urls
+        self.urls = VqaUrl
         self._verbose = verbose
 
         if False in [os.path.exists(p) for p in self.paths()]:

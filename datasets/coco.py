@@ -18,34 +18,49 @@ import os
 import torch.utils.data as data
 from PIL import Image
 
+
 class Coco(data.Dataset):
+
     def __init__(self, path, transform=None):
         self.path = path
         self.transform = transform
+
         self.images = {}
         self.ids = []
 
+        # populate the dataset
         for file in os.listdir(self.path):
-            if not file.endswith('.jpg'): continue
+            # continue if the file is not a jpg image, as all the images in
+            # coco are of jpg format.
+            if not file.endswith('.jpg'):
+                continue
 
+            # extract id from the filename and add to the dataset
             id = int(file.split('_')[-1].split('.')[0])
-            self.images[id] = file
+            self.images[id] = os.path.join(os.path.abspath(self.path), file)
 
+        # map id of the images with the dataset index
         self.ids = sorted(list(self.images.keys()))
 
     def __len__(self):
+        # return the length of the ids
         return len(self.ids)
 
-    def __getitem__(self, idx):
-        id = self.ids[idx]
-        image = Image.open(os.path.join(self.path, self.images[id]))
+    def __getitem__(self, index):
+        # convert index to id using precreated mappings
+        id = self.ids[index]
 
+        # Open Image corresponding to that particular id
+        image = Image.open(self.images[id]).convert('RGB')
+
+        # Transform image if the transformer is provided
         if self.transform:
             image = self.transform(image)
 
-        return image
+        return id, image
 
-class Composite(data.Dataset):
+
+class CocoComposite(data.Dataset):
     def __init__(self, *datasets):
         self.datasets = datasets
 
@@ -54,7 +69,8 @@ class Composite(data.Dataset):
 
     def __getitem__(self, idx):
         for d in self.datasets:
-            if idx < len(d): return d[idx]
+            if idx < len(d):
+                return d[idx]
 
             idx -= len(d)
 

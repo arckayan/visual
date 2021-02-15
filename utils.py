@@ -14,9 +14,16 @@
 
 # --*= utils.py =*--
 
+import os
+import h5py
+import torch
+
+import net
+import log
+
+from tqdm import tqdm
 from torchvision import transforms
 
-from datasets.coco import Coco, Composite
 
 def create_transform(image_size, central_fraction):
     return transforms.Compose(
@@ -29,12 +36,38 @@ def create_transform(image_size, central_fraction):
     )
 
 
-def coco_composite(transform, datafolders):
-    datasets = [Coco(df.paths()[0], transform=transform) for df in datafolders]
+def preprocess_composite(dataloader, options):
+    # Shape for the feature dataset (x, 2048, 14, 14)
+    shape = (
+        len(dataloader.dataset),
+        options.output_feature,
+        options.output_size,
+        options.output_size
+    )
 
-    return Composite(*datasets)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    log._L("preprocessing images using {}".format(log._P(device)))
+    model = net.Resnet()
+    model.to(device)
+    model.eval()
 
+    # process images using resent and store them in a h5 filep
+    with h5py.File(os.path.join(options.path, 'visual_features.h5'), mode='w', libver='latest') as fd:
+        # datasets for holding extracted features and corresponding ids
+        features = fd.create_dataset('features', shape=shape, dtype='float16')
+        ids = fd.create_dataset('ids', shape=(len(dataloader.dataset),), dtype='int32')
 
-def preprocess(transform, datafolders):
-     print(datafolders)
+        i = j = 0
+        # iterate over dataloader and process batch of images
+        for ids, imgs in tqdm(dataloader):
+            imgs.requires_grad_(True)
+            imgs.to(device)
+            out = model(imgs)
+
+            j = i + imgs.size(0)
+            print(i, j)
+            features[i:j, :, :] = out.data.cpu().numpy().astype('float16')
+            ids[i:j] = ids.numpy().astype('int32')
+            i = j
+
 
