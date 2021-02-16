@@ -1,27 +1,36 @@
 ![banner](/docs/banner.jpg)
 
-This repository is the collection multiple computer vision database, models and utilites.
+This repository is our implementation of various "Visual" tasks in computer vision and pattern recognition. 
 
-<!-- ### Introduction -->
+|                Paper          |                    PDF                        |
+|-------------------------------|-----------------------------------------------|
+| Show, Ask, Attend, and Answer | [arxiv](https://arxiv.org/pdf/1704.03162.pdf) |
 
-<!-- ### Installation 
+## Datasets `--download`
 
-you will need wget install in your system to download the datasets, run:
-- Mac - `brew install wget`
-- Linux - `apt-get install wget`
-- Windows - `winget install -e --id GnuWin32.Wget` -->
+The repository comes with inbuilt utility for downloading and processing datasets, and the commands are following:
 
-<!-- ### Usage -->
-
-## Download Dataset
-
-Download the dataset with inbuilt utility, run the following command and specify the split that you wish to download.
-
+To download the dataset use `--download` option and `--split` to sepecify the split to be downloaded. This will download the dataset in the default path (`./data/vqa`)
 ```bash
-python . --split [valid|train|test] --download 
+python . --split [valid | train | test] --download 
 ```
 
-The dataset can also be downloaded in the custom specified path with  `--path` option
+The dataset can also be downloaded in the custom specified path with  `--path` option.
 ```bash
-python . --split [valid|train|test] --path <path> --download 
+python . --split [valid | train | test] --path <path> --download 
 ```
+
+## Extracting Visual Features `--process-vf`
+
+The visual features are extracted and stored in a `h5` file (specified by `--vf-file`, that defaults to `data/vqa/visual_features.h5`), so that we don't recompute these every time
+
+```bash
+python . --vf-file [data/vqa/visual_features.h5 | custom part] --process-vf 
+```
+
+There may be case when the processing of an image might have failed, therfore after computing the features run the following to verify the features:
+
+```bash
+python . --vf-file [data/vqa/visual_features.h5 | custom part] --verify-vf
+```
+

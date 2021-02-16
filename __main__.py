@@ -1,5 +1,4 @@
 # Copyright (C) 2020 Manish Sahani <rec.manish.sahani@gmail.com>.
-#
 # This code is Licensed under the Apache License, Version 2.0 (the "License");
 # A copy of a License can be obtained at:
 #                 http://www.apache.org/licenses/LICENSE-2.0#
@@ -19,87 +18,112 @@ import torch
 
 import log
 import net
-import datasets
 import utils
+import datasets
+import preprocessing
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    # '--download' argument downloads the dataset in the provided or default path
+    # defaults
+    _vqa = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data/vqa')
+
+    # '--download' (action) downloads the dataset in the path provided by the
+    # user or in the default path (vqa_path)
     parser.add_argument("--download",
                         action="store_true",
-                        help="download the dataset from the web")
+                        help="download the dataset from the web.")
 
-    # '--path' argument specifies the dataset path
+    # '--process-vf' (action) genreates the image feature database from of
+    # vqa images using a resnet model.
+    parser.add_argument("--process-vf",
+                        action="store_true",
+                        help="process and extract features from images.")
+
+    # '--process-tf' (action) genreates the vocab from the question and ans.
+    parser.add_argument("--process-tf",
+                        action="store_true",
+                        help="process the QA pairs and create a vocab.")
+
+    # '--verify-vf' (action) verifies the features in feature file are processed
+    # or not.
+    parser.add_argument("--verify-vf",
+                        action="store_true",
+                        help="verify the features in the features file.")
+
+    # '--path' (argument) specifies the dataset path where the dataset will be
+    # downloaded and processed
     parser.add_argument("--path",
-                        default=os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data/vqa'),
-                        help="path where the dataset is loaded")
+                        default=_vqa,
+                        help="path where the dataset is loaded.")
 
-    # '--split' argument is for specifying the dataset split to use, can be combined
-    # preprocessing and downloading.
+    # '--split' (argument) is for specifying the dataset split, can be combined
+    # downloading, traning and evaluating.
     parser.add_argument("--split",
                         default='valid',
-                        help="specify the split for the dataset")
+                        help="specify the split for the dataset.")
 
-    # '--preprocess' argument genreates the image feature database from of vqa images
-    # using a resnet model.
-    parser.add_argument("--preprocess",
-                        action="store_true",
-                        help="preprocess the images and extract features using resnet")
-
-    # '--verbose' argument is for detailed logging of all the processes, it takes
-    # numbers(levels) upto 4, four being the level with the highest details.
+    # '--verbose' (argument) is for detailed logging of all the processes, it
+    # takes numbers(levels) upto 4, four being the level with the highest.
     parser.add_argument("--verbose",
                         type=int,
                         default=0,
-                        help="set output verbosity")
+                        help="set output verbosity for the program.")
 
-
-    # '--batch-size' is for specifying the dataloader's batch size
+    # '--batch-size' (argument) is for specifying the dataloader's batch size
     parser.add_argument("--batch-size",
                         type=int,
                         default=64,
-                        help="size of the batchs used for training")
+                        help="size of the batchs used for training.")
 
-    # '--image-size' specifies the size of the final input image (after cropping and
-    # adding paddings)
+    # '--image-size' (argument) specifies the size of the final input image
+    # after cropping and adding paddings
     parser.add_argument("--image-size",
                         type=int,
                         default=448,
                         help="size of the input image to be fed into NN.")
 
-    # '--central-fraction' is used when images are cropped, this tells the module how
-    # much to scale
+    # '--central-fraction' (argument) is used when images are cropped, this
+    # tells the module how much to scale
     parser.add_argument("--central-fraction",
                         type=int,
                         default=0.875,
-                        help="Only take this much of the centre when scaling and cropping")
+                        help="take this much of the centre when cropping.")
 
-    # '--num-workers' specifies the number of workers for the pytorch dataloader
+    # '--num-workers' (argument) specifies the nu of workers for the dataloader
     parser.add_argument("--num-workers",
                         type=int,
                         default=8,
-                        help="specifies the number of workers for the dataloader")
+                        help="specifies the num of workers for the dataloader")
+
+    # '--visual-features' (argument) is the processed feature database file of
+    # coco images
+    parser.add_argument("--vf-file",
+                        default=os.path.join(_vqa, 'visual_features.h5'),
+                        help="specifies the visual_features file")
 
     args = parser.parse_args()
     args.output_size = args.image_size // 32
     args.output_feature = 2048
-    # OUTPUT_SIZE = args.image_size // 32
-    # OUTPUT_FEATURES = 2048 # same as number of features
 
     if args.download:
         # Download the dataset
         df = datasets.vqa.DataFolder(split=args.split, path=args.path)
-        log._L("{} split downloaded at {}".format(log._S(args.split), log._P(args.path)))
+        log._L("{} split downloaded at {}".format(log._S(args.split),
+                                                  log._P(args.path)))
 
-    if args.preprocess:
+    if args.process_vf:
         # Create a transformer for the the image - this will do the cropping and
         # add paddings to the image.
-        transform = utils.create_transform(args.image_size, args.central_fraction)
+        transform = utils.create_transform(args.image_size,
+                                           args.central_fraction)
 
         # Create an array of DataFolder of all the split
-        dfs = [datasets.vqa.DataFolder(split=s, path=args.path) for s in ['train', 'test', 'valid']]
+        dfs = [
+            datasets.vqa.DataFolder(split=s, path=args.path)
+            for s in ['train', 'test', 'valid']
+        ]
 
         # Array of Coco Image dataset for all splits
         ds = [datasets.Coco(df.paths()[0], transform=transform) for df in dfs]
@@ -116,7 +140,8 @@ if __name__ == "__main__":
                                                  pin_memory=True)
 
         # Extract Features from the composite_dataset images using resent or F-RCNN
-        utils.preprocess_composite(dataloader, args)
+        preprocessing.process_vf(dataloader, args)
 
-    # verify the preprocessing
-    utils.verify_preprocessing(args)
+    if args.verify_vf:
+        # verify the processed visual features in the vf_file
+        preprocessing.verify_vf(args)
