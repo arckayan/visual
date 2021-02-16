@@ -16,7 +16,7 @@
 
 import os
 import torch.utils.data as data
-from PIL import Image
+from PIL import Image, ImageFile
 
 
 class Coco(data.Dataset):
@@ -51,6 +51,7 @@ class Coco(data.Dataset):
         id = self.ids[index]
 
         # Open Image corresponding to that particular id
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
         image = Image.open(self.images[id]).convert('RGB')
 
         # Transform image if the transformer is provided

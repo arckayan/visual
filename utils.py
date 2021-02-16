@@ -17,6 +17,7 @@
 import os
 import h5py
 import torch
+import numpy as np
 
 import net
 import log
@@ -55,19 +56,25 @@ def preprocess_composite(dataloader, options):
     with h5py.File(os.path.join(options.path, 'visual_features.h5'), mode='w', libver='latest') as fd:
         # datasets for holding extracted features and corresponding ids
         features = fd.create_dataset('features', shape=shape, dtype='float16')
-        ids = fd.create_dataset('ids', shape=(len(dataloader.dataset),), dtype='int32')
+        image_ids = fd.create_dataset('ids', shape=(len(dataloader.dataset),), dtype='int32')
 
         i = j = 0
+        c = 18720
         # iterate over dataloader and process batch of images
         for ids, imgs in tqdm(dataloader):
+            j = i + imgs.size(0)
             imgs.requires_grad_(True)
-            imgs.to(device)
+            imgs = imgs.to(device)
             out = model(imgs)
 
-            j = i + imgs.size(0)
-            print(i, j)
             features[i:j, :, :] = out.data.cpu().numpy().astype('float16')
-            ids[i:j] = ids.numpy().astype('int32')
+            image_ids[i:j] = ids.numpy().astype('int32')
             i = j
 
 
+def verify_preprocessing(options):
+    with h5py.File(os.path.join(options.path, 'visual_features.h5'), mode='r') as fd:
+        print(fd['features'][0].shape)
+        for i in fd['ids']:
+            if i == 0:
+                print("found")

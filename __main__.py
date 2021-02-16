@@ -117,3 +117,6 @@ if __name__ == "__main__":
 
         # Extract Features from the composite_dataset images using resent or F-RCNN
         utils.preprocess_composite(dataloader, args)
+
+    # verify the preprocessing
+    utils.verify_preprocessing(args)

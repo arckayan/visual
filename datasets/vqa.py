@@ -18,13 +18,14 @@ import os
 import json
 
 import torch
-from PIL import Image
+from PIL import Image, ImageFile
 from torch.utils.data import Dataset
 
 from log import _P, _L, _S
 from datasets.vocabulary import Vocabulary
 from datasets.downloader import wget, unzip
 from datasets.urls import VqaUrl
+
 
 class DataFolder:
     """
