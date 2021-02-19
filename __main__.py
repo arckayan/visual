@@ -103,6 +103,15 @@ if __name__ == "__main__":
                         default=os.path.join(_vqa, 'visual_features.h5'),
                         help="specifies the visual_features file")
 
+    # '--vocab-most-common' (argument) is the top most common words choosen
+    # while processing
+    parser.add_argument("--vocab-most-common",
+                        help="choose most common words while processing qa.")
+
+    parser.add_argument("--tf-file",
+                        default=os.path.join(_vqa, 'textual_vocab.json'),
+                        help="specifies the textual vocab file")
+
     args = parser.parse_args()
     args.output_size = args.image_size // 32
     args.output_feature = 2048
@@ -145,3 +154,9 @@ if __name__ == "__main__":
     if args.verify_vf:
         # verify the processed visual features in the vf_file
         preprocessing.verify_vf(args)
+
+    if args.process_tf:
+        # process textual features
+        df = datasets.vqa.DataFolder(split=args.split, path=args.path)
+
+        preprocessing.process_tf(df, args)

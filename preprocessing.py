@@ -12,14 +12,20 @@
 # limitations under the License.
 
 import os
+import re
 import h5py
+import json
 import torch
+import string
+import itertools
 
 # Module under  this repository
 import net
 import log
 
+from collections import Counter
 from tqdm import tqdm
+
 
 def process_vf(dataloader, options):
     if os.path.exists(options.vf_file):
@@ -50,7 +56,6 @@ def process_vf(dataloader, options):
                                       dtype='int32')
 
         i = j = 0
-        c = 18720
         # iterate over dataloader and process batch of images
         for ids, imgs in tqdm(dataloader):
             j = i + imgs.size(0)
@@ -75,3 +80,79 @@ def verify_vf(options):
             if fd['ids'][i] == 0:
                 log._D("Error at index {} in feature file".format(i))
                 break
+
+
+
+# this is used for normalizing questions
+_special_chars = re.compile('[^a-z0-9 ]*')
+
+# these try to emulate the original normalization scheme for answers
+_period_strip = re.compile(r'(?!<=\d)(\.)(?!\d)')
+_comma_strip = re.compile(r'(\d)(,)(\d)')
+_punctuation_chars = re.escape(r';/[]"{}()=+\_-><@`,?!')
+_punctuation = re.compile(r'([{}])'.format(re.escape(_punctuation_chars)))
+_punctuation_with_a_space = re.compile(r'(?<= )([{0}])|([{0}])(?= )'.format(_punctuation_chars))
+
+
+def process_punctuation(sen):
+    if _punctuation.search(sen) is None:
+        return sen
+    s = _punctuation_with_a_space .sub('', sen)
+    if re.search(_comma_strip, s) is not None:
+        s = s.replace(',', '')
+    s = _punctuation.sub(' ', s)
+    s = _period_strip.sub('', s)
+    return s.strip()
+
+
+def tokenize_questions(path):
+    # TODO : use NLTK for processing and cleaning
+    with open(path) as fd:
+        questions_json = json.load(fd)
+        questions = [q['question'] for q in questions_json['questions']]
+
+        for question in questions:
+            # prepare every question for processing - make it lower case
+            # remove ? from the end
+            question = process_punctuation(question.lower())
+            # split the question into words and return the token
+            yield question.split(' ')
+
+
+def tokenize_answers(path):
+    with open(path) as fd:
+        answers_json = json.load(fd)
+        answers = [[answer['answer'] for answer in ans_dict['answers']]
+                   for ans_dict in answers_json['annotations']]
+
+        for answer in answers:
+            yield list(map(process_punctuation, answer))
+
+
+def vocab_from_tokens(itr, top=None, min_value=0):
+    tokens = itertools.chain.from_iterable(itr)
+    counter = Counter(tokens)
+
+    tokens = sorted(counter.keys() if top is None else
+                    {t for t, c in counter.most_common(top)},
+                    key=lambda x: (counter[x], x),
+                    reverse=True)
+    vocab = {t:i for i, t in enumerate(tokens, start=min_value)}
+    return vocab
+
+
+def process_tf(datafolder, options):
+    questions_path = datafolder.paths()[1]
+    questions = tokenize_questions(questions_path)
+
+    if options.split != 'test':
+        answers_path = datafolder.paths()[2]
+        answers = tokenize_answers(answers_path)
+
+    with open(options.tf_file, mode='w') as fd:
+        json.dump(
+            {
+                "question": vocab_from_tokens(questions, min_value=1),
+                "answer": vocab_from_tokens(answers, top=3000)
+            }, fd)
+
